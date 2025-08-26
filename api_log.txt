@@ -1,0 +1,1 @@
+{"status":"error","message":"Ge\u00e7ersiz i\u015flem."}
