@@ -248,6 +248,64 @@ switch ($action) {
             }
         }
         break;
+case 'get_magaza_detay':
+        if ($_SESSION['rol'] !== 'Admin') { break; }
+        $magaza_id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+        if ($magaza_id) {
+            $stmt = $pdo->prepare("SELECT * FROM magazalar WHERE id = ?");
+            $stmt->execute([$magaza_id]);
+            $magaza = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($magaza) {
+                $response = ['status' => 'success', 'magaza' => $magaza];
+            } else {
+                $response['message'] = 'Mağaza bulunamadı.';
+            }
+        }
+        break;
+
+    case 'magaza_kaydet':
+        if ($_SESSION['rol'] !== 'Admin') { break; }
+        
+        $magaza_id = filter_input(INPUT_POST, 'magaza_id', FILTER_VALIDATE_INT);
+        $magaza_adi = trim($_POST['magaza_adi'] ?? '');
+        $sehir = trim($_POST['sehir'] ?? '');
+        $adres = trim($_POST['adres'] ?? '');
+
+        if (empty($magaza_adi) || empty($sehir)) {
+            $response['message'] = 'Mağaza adı ve şehir alanları zorunludur.';
+            break;
+        }
+        
+        try {
+            if ($magaza_id) { // Güncelleme
+                $sql = "UPDATE magazalar SET magaza_adi = ?, sehir = ?, adres = ? WHERE id = ?";
+                $params = [$magaza_adi, $sehir, $adres, $magaza_id];
+                $log_mesaj = "$magaza_adi adlı mağaza güncellendi.";
+                $log_tipi = 'MAGAZA_DUZENLENDI';
+            } else { // Ekleme
+                $sql = "INSERT INTO magazalar (magaza_adi, sehir, adres) VALUES (?, ?, ?)";
+                $params = [$magaza_adi, $sehir, $adres];
+                $log_mesaj = "$magaza_adi adlı mağaza eklendi.";
+                $log_tipi = 'MAGAZA_EKLENDI';
+            }
+
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            
+            $kayit_id = $magaza_id ?: $pdo->lastInsertId();
+            logla($pdo, $log_tipi, $log_mesaj, $kayit_id);
+            
+            // İşlem sonrası mağazanın tam bilgisini çekip döndür
+            $stmt_get = $pdo->prepare("SELECT * FROM magazalar WHERE id = ?");
+            $stmt_get->execute([$kayit_id]);
+            $guncel_magaza = $stmt_get->fetch(PDO::FETCH_ASSOC);
+
+            $response = ['status' => 'success', 'message' => 'İşlem başarıyla tamamlandı!', 'magaza' => $guncel_magaza];
+
+        } catch (PDOException $e) {
+            $response['message'] = 'Veritabanı hatası: ' . $e->getMessage();
+        }
+        break;
 }
 
 echo json_encode($response);
