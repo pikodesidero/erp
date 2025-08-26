@@ -389,3 +389,102 @@ function debounce(func, delay) {
         timeout = setTimeout(() => func.apply(context, args), delay);
     };
 }
+// YENİ EKLENEN KISIM: Mağaza Yönetimi Sayfası
+    const magazaModal = document.getElementById('magazaModal');
+    if (magazaModal) {
+        const modal = new bootstrap.Modal(magazaModal);
+
+        // "Yeni Mağaza Ekle" butonu
+        document.getElementById('yeniMagazaBtn').addEventListener('click', function() {
+            resetMagazaForm();
+            modal.show();
+        });
+
+        // "Düzenle" butonları (Event Delegation)
+        document.getElementById('magazaTableBody').addEventListener('click', async function(e) {
+            const editButton = e.target.closest('.edit-btn-magaza');
+            if (editButton) {
+                const magazaId = editButton.dataset.id;
+                await getMagazaDetay(magazaId);
+                modal.show();
+            }
+        });
+
+        // Modal'daki kaydetme formu
+        document.getElementById('magazaForm').addEventListener('submit', kaydetMagazaHandler);
+    }
+
+
+/** YENİ FONKSİYONLAR **/
+
+function resetMagazaForm() {
+    const form = document.getElementById('magazaForm');
+    form.reset();
+    document.getElementById('magazaModalLabel').textContent = 'Yeni Mağaza Ekle';
+    document.getElementById('magaza_id').value = '';
+}
+
+async function getMagazaDetay(id) {
+    resetMagazaForm();
+    try {
+        const response = await fetch(`/erp/api.php?action=get_magaza_detay&id=${id}`);
+        const data = await response.json();
+
+        if (data.status === 'success') {
+            const form = document.getElementById('magazaForm');
+            const m = data.magaza;
+            document.getElementById('magazaModalLabel').textContent = 'Mağaza Düzenle: ' + m.magaza_adi;
+            document.getElementById('magaza_id').value = m.id;
+            form.magaza_adi.value = m.magaza_adi;
+            form.sehir.value = m.sehir;
+            form.adres.value = m.adres;
+        } else {
+            alert(data.message);
+        }
+    } catch (error) {
+        console.error('Mağaza detayı alınamadı:', error);
+    }
+}
+
+async function kaydetMagazaHandler(e) {
+    e.preventDefault();
+    const form = e.target;
+    const formData = new FormData(form);
+    formData.append('action', 'magaza_kaydet');
+    const magazaId = document.getElementById('magaza_id').value;
+
+    try {
+        const response = await fetch('/erp/api.php', { method: 'POST', body: formData });
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            const modalInstance = bootstrap.Modal.getInstance(document.getElementById('magazaModal'));
+            modalInstance.hide();
+            updateMagazaTable(result.magaza, magazaId);
+        } else {
+            alert(result.message);
+        }
+    } catch (error) {
+        console.error('Mağaza kaydedilemedi:', error);
+    }
+}
+
+function updateMagazaTable(magaza, originalId) {
+    const tableBody = document.getElementById('magazaTableBody');
+    const newRowHTML = `
+        <td>${magaza.magaza_adi}</td>
+        <td>${magaza.sehir}</td>
+        <td><button class="btn btn-sm btn-info edit-btn-magaza" data-id="${magaza.id}"><i class="bi bi-pencil-square"></i></button></td>
+    `;
+
+    if (originalId) { // Güncelleme
+        const rowToUpdate = tableBody.querySelector(`tr[data-magaza-id="${originalId}"]`);
+        if (rowToUpdate) {
+            rowToUpdate.innerHTML = newRowHTML;
+        }
+    } else { // Ekleme
+        const newRow = tableBody.insertRow(0); // En üste ekle
+        newRow.setAttribute('data-magaza-id', magaza.id);
+        newRow.innerHTML = newRowHTML;
+    }
+}
